@@ -1,5 +1,6 @@
-use crate::data::{Game, Report};
+use crate::report::{FinishedGame, Report};
 use std::{
+    collections::HashMap,
     io::{self, BufRead, BufReader, Read},
     mem,
 };
@@ -8,17 +9,21 @@ pub fn parse<R>(reader: R) -> io::Result<Report>
 where
     R: Read,
 {
-    let mut parser = Parser::new(reader);
+    let mut buf_reader = BufReader::new(reader);
+    let mut line_buf = String::new();
+    let mut parser = Parser::new();
     loop {
-        if let Err(error) = parser.read_line() {
+        line_buf.clear();
+
+        if let Err(error) = buf_reader.read_line(&mut line_buf) {
             let result = match error.kind() {
-                io::ErrorKind::UnexpectedEof => Ok(parser.report),
+                io::ErrorKind::UnexpectedEof => Ok(parser.finish()),
                 _ => Err(error),
             };
-            break result;
+            return result;
         }
 
-        parser.process_line();
+        parser.process_line(&line_buf);
     }
 }
 
@@ -30,31 +35,40 @@ struct RawEvent<'line> {
 
 impl<'line> RawEvent<'line> {
     fn from_line(line: &'line str) -> Option<Self> {
-        let mut split_index = line.find(char::is_alphabetic)?;
+        let split_index = line.find(char::is_alphabetic)?;
         let event_str = &line[split_index ..];
         let (key, raw_data) = event_str.split_once(':')?;
         Some(Self { key: key.trim(), raw_data: raw_data.trim() })
     }
 
-    fn parse(self) -> Option<Event> {
+    fn parse(self) -> Option<Event<'line>> {
         match self.key {
             "InitGame" => Some(Event::Init),
             "ShutdownGame" => Some(Event::Shutdown),
+            "ClientUserinfoChanged" => {
+                let (_, name_trailing) = self.raw_data.split_once("n\\")?;
+                let name = match name_trailing.split_once("t\\") {
+                    Some((name, _)) => name,
+                    None => name_trailing,
+                };
+                Some(Event::ClientChanged { name })
+            },
             _ => None,
         }
     }
 }
 
 #[derive(Debug)]
-enum Event {
+enum Event<'line> {
     Init,
     Shutdown,
+    ClientChanged { name: &'line str },
 }
 
 #[derive(Debug, Clone)]
 enum State {
     NoGame,
-    InGame(Game),
+    InGame(FinishedGame),
 }
 
 impl Default for State {
@@ -64,37 +78,19 @@ impl Default for State {
 }
 
 #[derive(Debug)]
-struct Parser<R> {
-    reader: BufReader<R>,
-    line_buf: String,
+struct Parser {
     game_id: u64,
     report: Report,
     state: State,
 }
 
-impl<R> Parser<R>
-where
-    R: Read,
-{
-    fn new(reader: R) -> Self {
-        Self {
-            reader: BufReader::new(reader),
-            line_buf: String::new(),
-            game_id: 1,
-            report: Report::default(),
-            state: State::NoGame,
-        }
+impl Parser {
+    fn new() -> Self {
+        Self { game_id: 1, report: Report::default(), state: State::NoGame }
     }
 
-    fn read_line(&mut self) -> io::Result<()> {
-        self.line_buf.clear();
-        self.reader.read_line(&mut self.line_buf)?;
-        Ok(())
-    }
-
-    fn process_line(&mut self) {
-        if let Some(event) =
-            RawEvent::from_line(&self.line_buf).and_then(RawEvent::parse)
+    fn process_line(&mut self, line: &str) {
+        if let Some(event) = RawEvent::from_line(line).and_then(RawEvent::parse)
         {
             match event {
                 Event::Init => {
@@ -102,8 +98,16 @@ where
                     self.start_game();
                 },
                 Event::Shutdown => self.finish_game(),
+                Event::ClientChanged { name } => {
+                    self.touch_player(name);
+                },
             }
         }
+    }
+
+    fn finish(mut self) -> Report {
+        self.finish_game();
+        self.report
     }
 
     fn finish_game(&mut self) {
@@ -118,6 +122,15 @@ where
     }
 
     fn start_game(&mut self) {
-        self.state = State::InGame(Game::default());
+        self.state = State::InGame(FinishedGame::default());
+    }
+
+    fn touch_player(&mut self, name: &str) {
+        if let State::InGame(game) = &mut self.state {
+            if !game.players.contains(name) {
+                game.players.insert(String::from(name));
+                game.kills.insert(String::from(name), 0);
+            }
+        }
     }
 }
