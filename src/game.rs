@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-pub type PlayerId = u64;
+pub type PlayerId = u32;
 
 pub type KillCount = i64;
 
 pub type PlayerName = String;
 
-pub type MeanOfKilling = String;
+pub type MeansOfKilling = String;
 
 pub const MEANS_OF_KILLING: &[&str] = &[
     "MOD_UNKNOWN", "MOD_SHOTGUN", "MOD_GAUNTLET", "MOD_MACHINEGUN",
@@ -18,17 +18,29 @@ pub const MEANS_OF_KILLING: &[&str] = &[
     "MOD_PROXIMITY_MINE", "MOD_KAMIKAZE", "MOD_JUICED", "MOD_GRAPPLE",
 ];
 
+pub const WORLD_ID: PlayerId = 1022;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Killer {
     World,
     Player(PlayerId),
 }
 
+impl Killer {
+    pub fn from_id(id: PlayerId) -> Self {
+        if id == WORLD_ID {
+            Self::World
+        } else {
+            Self::Player(id)
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Kill {
     pub killer: Killer,
-    pub mean: MeanOfKilling,
     pub target: PlayerId,
+    pub mean: MeansOfKilling,
 }
 
 #[derive(Debug, Clone, Default)]

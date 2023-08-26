@@ -1,29 +1,70 @@
-use crate::report::{FinishedGame, Report};
+use crate::game::{
+    Game,
+    Kill,
+    Killer,
+    MeansOfKilling,
+    PlayerId,
+    PlayerName,
+    MEANS_OF_KILLING,
+};
 use std::{
-    collections::HashMap,
+    collections::hash_map,
     io::{self, BufRead, BufReader, Read},
     mem,
 };
 
-pub fn parse<R>(reader: R) -> io::Result<Report>
+#[derive(Debug)]
+pub struct Parser<R> {
+    reader: R,
+    line_buf: String,
+    state: State,
+}
+
+impl<R> Parser<BufReader<R>>
 where
     R: Read,
 {
-    let mut buf_reader = BufReader::new(reader);
-    let mut line_buf = String::new();
-    let mut parser = Parser::new();
-    loop {
-        line_buf.clear();
+    pub fn new(reader: R) -> Self {
+        Self::with_bufread(BufReader::new(reader))
+    }
+}
 
-        if let Err(error) = buf_reader.read_line(&mut line_buf) {
-            let result = match error.kind() {
-                io::ErrorKind::UnexpectedEof => Ok(parser.finish()),
-                _ => Err(error),
-            };
-            return result;
+impl<R> Parser<R>
+where
+    R: BufRead,
+{
+    pub fn with_bufread(reader: R) -> Self {
+        Self { reader, line_buf: String::new(), state: State::NoGame }
+    }
+
+    fn finish(&mut self) -> Option<Game> {
+        self.state.finish_game()
+    }
+}
+
+impl<R> Iterator for Parser<R>
+where
+    R: BufRead,
+{
+    type Item = io::Result<Game>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            self.line_buf.clear();
+
+            match self.reader.read_line(&mut self.line_buf) {
+                Ok(0) => return self.finish().map(Ok),
+                Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => {
+                    return self.finish().map(Ok)
+                },
+                Err(error) => return Some(Err(error)),
+                _ => (),
+            }
+
+            if let Some(game) = self.state.process_line(&self.line_buf) {
+                return Some(Ok(game));
+            }
         }
-
-        parser.process_line(&line_buf);
     }
 }
 
@@ -41,34 +82,55 @@ impl<'line> RawEvent<'line> {
         Some(Self { key: key.trim(), raw_data: raw_data.trim() })
     }
 
-    fn parse(self) -> Option<Event<'line>> {
+    fn parse(self) -> Option<Event> {
         match self.key {
             "InitGame" => Some(Event::Init),
+
             "ShutdownGame" => Some(Event::Shutdown),
+
             "ClientUserinfoChanged" => {
-                let (_, name_trailing) = self.raw_data.split_once("n\\")?;
-                let name = match name_trailing.split_once("t\\") {
+                let (id_str, tail) = self.raw_data.trim().split_once(' ')?;
+                let id = id_str.trim().parse().ok()?;
+                let (_, name_trailing) = tail.split_once("n\\")?;
+                let name = match name_trailing.split_once("\\") {
                     Some((name, _)) => name,
                     None => name_trailing,
                 };
-                Some(Event::ClientChanged { name })
+                Some(Event::PlayerNameChanged {
+                    id,
+                    name: PlayerName::from(name),
+                })
             },
+
+            "Kill" => {
+                let (killer_str, tail) =
+                    self.raw_data.trim().split_once(' ')?;
+                let (target_str, tail) = tail.trim().split_once(' ')?;
+                let (mean_str, _) = tail.trim().split_once(':')?;
+                let killer = Killer::from_id(killer_str.trim().parse().ok()?);
+                let target = target_str.trim().parse().ok()?;
+                let mean_index: usize = mean_str.parse().ok()?;
+                let mean = MeansOfKilling::from(MEANS_OF_KILLING[mean_index]);
+                Some(Event::Kill { killer, target, mean })
+            },
+
             _ => None,
         }
     }
 }
 
 #[derive(Debug)]
-enum Event<'line> {
+enum Event {
     Init,
     Shutdown,
-    ClientChanged { name: &'line str },
+    PlayerNameChanged { id: PlayerId, name: PlayerName },
+    Kill { killer: Killer, target: PlayerId, mean: MeansOfKilling },
 }
 
 #[derive(Debug, Clone)]
 enum State {
     NoGame,
-    InGame(FinishedGame),
+    InGame(Game),
 }
 
 impl Default for State {
@@ -77,60 +139,54 @@ impl Default for State {
     }
 }
 
-#[derive(Debug)]
-struct Parser {
-    game_id: u64,
-    report: Report,
-    state: State,
-}
-
-impl Parser {
-    fn new() -> Self {
-        Self { game_id: 1, report: Report::default(), state: State::NoGame }
-    }
-
-    fn process_line(&mut self, line: &str) {
-        if let Some(event) = RawEvent::from_line(line).and_then(RawEvent::parse)
-        {
-            match event {
-                Event::Init => {
-                    self.finish_game();
-                    self.start_game();
-                },
-                Event::Shutdown => self.finish_game(),
-                Event::ClientChanged { name } => {
-                    self.touch_player(name);
-                },
-            }
+impl State {
+    fn process_line(&mut self, line: &str) -> Option<Game> {
+        let event = RawEvent::from_line(line).and_then(RawEvent::parse)?;
+        match event {
+            Event::Init => {
+                let maybe_game = self.finish_game();
+                self.start_game();
+                maybe_game
+            },
+            Event::Shutdown => self.finish_game(),
+            Event::PlayerNameChanged { id, name } => {
+                self.change_player_name(id, name);
+                None
+            },
+            Event::Kill { killer, target, mean } => {
+                self.kill(killer, target, mean);
+                None
+            },
         }
     }
 
-    fn finish(mut self) -> Report {
-        self.finish_game();
-        self.report
-    }
-
-    fn finish_game(&mut self) {
-        match mem::take(&mut self.state) {
-            State::InGame(game) => {
-                let game_name = format!("game_{}", self.game_id);
-                self.report.games.insert(game_name, game);
-                self.game_id += 1;
-            },
-            State::NoGame => (),
+    fn finish_game(&mut self) -> Option<Game> {
+        match mem::take(self) {
+            State::InGame(game) => Some(game),
+            State::NoGame => None,
         }
     }
 
     fn start_game(&mut self) {
-        self.state = State::InGame(FinishedGame::default());
+        *self = State::InGame(Game::default());
     }
 
-    fn touch_player(&mut self, name: &str) {
-        if let State::InGame(game) = &mut self.state {
-            if !game.players.contains(name) {
-                game.players.insert(String::from(name));
-                game.kills.insert(String::from(name), 0);
+    fn change_player_name(&mut self, id: PlayerId, name: PlayerName) {
+        if let State::InGame(game) = self {
+            match game.players.entry(id) {
+                hash_map::Entry::Occupied(mut entry) => {
+                    *entry.get_mut() = name;
+                },
+                hash_map::Entry::Vacant(entry) => {
+                    entry.insert(name);
+                },
             }
+        }
+    }
+
+    fn kill(&mut self, killer: Killer, target: PlayerId, mean: MeansOfKilling) {
+        if let State::InGame(game) = self {
+            game.kills.push(Kill { killer, target, mean });
         }
     }
 }

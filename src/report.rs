@@ -2,20 +2,20 @@ use crate::game::{
     Game,
     KillCount,
     Killer,
-    MeanOfKilling,
+    MeansOfKilling,
     PlayerName,
     MEANS_OF_KILLING,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 pub type GameName = String;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct GameReport {
     pub total_kills: KillCount,
-    pub players: HashSet<PlayerName>,
-    pub kills: HashMap<PlayerName, KillCount>,
-    pub kills_by_means: HashMap<MeanOfKilling, KillCount>,
+    pub players: BTreeSet<PlayerName>,
+    pub kills: BTreeMap<PlayerName, KillCount>,
+    pub kills_by_means: BTreeMap<MeansOfKilling, KillCount>,
 }
 
 impl GameReport {
@@ -31,7 +31,7 @@ impl GameReport {
         let kills_by_means = MEANS_OF_KILLING
             .iter()
             .copied()
-            .map(|mean| (MeanOfKilling::from(mean), 0))
+            .map(|mean| (MeansOfKilling::from(mean), 0))
             .collect();
 
         let mut this = Self { total_kills, players, kills, kills_by_means };
@@ -39,15 +39,15 @@ impl GameReport {
         for kill in &game.kills {
             match kill.killer {
                 Killer::World => {
-                    let mut player_name = &game.players[&kill.target];
-                    this.kills[player_name] -= 1;
+                    let player_name = &game.players[&kill.target];
+                    *this.kills.get_mut(player_name).unwrap() -= 1;
                 },
                 Killer::Player(killer_id) => {
-                    let mut player_name = &game.players[&killer_id];
-                    this.kills[player_name] += 1;
+                    let player_name = &game.players[&killer_id];
+                    *this.kills.get_mut(player_name).unwrap() += 1;
                 },
             }
-            this.kills_by_means[&kill.mean] += 1;
+            *this.kills_by_means.get_mut(&kill.mean).unwrap() += 1;
         }
 
         this
@@ -56,7 +56,7 @@ impl GameReport {
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct LogReport {
-    pub games: HashMap<GameName, GameReport>,
+    pub games: BTreeMap<GameName, GameReport>,
 }
 
 impl LogReport {
@@ -64,7 +64,7 @@ impl LogReport {
     where
         I: IntoIterator<Item = Result<Game, E>>,
     {
-        let mut this = Self { games: HashMap::new() };
+        let mut this = Self { games: BTreeMap::new() };
         for (i, result) in game_iter.into_iter().enumerate() {
             let game = result?;
             let game_report = GameReport::generate(&game);
