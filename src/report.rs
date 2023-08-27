@@ -31,7 +31,7 @@ impl GameReport {
         let kills_by_means = MEANS_OF_KILLING
             .iter()
             .copied()
-            .map(|mean| (MeansOfKilling::from(mean), 0))
+            .map(|means| (MeansOfKilling::from(means), 0))
             .collect();
 
         let mut this = Self { total_kills, players, kills, kills_by_means };
@@ -47,7 +47,7 @@ impl GameReport {
                     *this.kills.get_mut(player_name).unwrap() += 1;
                 },
             }
-            *this.kills_by_means.get_mut(&kill.mean).unwrap() += 1;
+            *this.kills_by_means.get_mut(&kill.means).unwrap() += 1;
         }
 
         this

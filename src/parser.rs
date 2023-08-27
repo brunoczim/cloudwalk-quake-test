@@ -13,6 +13,9 @@ use std::{
     mem,
 };
 
+#[cfg(test)]
+mod test;
+
 #[derive(Debug)]
 pub struct Parser<R> {
     reader: R,
@@ -68,7 +71,7 @@ where
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct RawEvent<'line> {
     key: &'line str,
     raw_data: &'line str,
@@ -110,8 +113,8 @@ impl<'line> RawEvent<'line> {
                 let killer = Killer::from_id(killer_str.trim().parse().ok()?);
                 let target = target_str.trim().parse().ok()?;
                 let mean_index: usize = mean_str.parse().ok()?;
-                let mean = MeansOfKilling::from(MEANS_OF_KILLING[mean_index]);
-                Some(Event::Kill { killer, target, mean })
+                let means = MeansOfKilling::from(MEANS_OF_KILLING[mean_index]);
+                Some(Event::Kill { killer, target, means })
             },
 
             _ => None,
@@ -119,12 +122,12 @@ impl<'line> RawEvent<'line> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Event {
     Init,
     Shutdown,
     PlayerNameChanged { id: PlayerId, name: PlayerName },
-    Kill { killer: Killer, target: PlayerId, mean: MeansOfKilling },
+    Kill { killer: Killer, target: PlayerId, means: MeansOfKilling },
 }
 
 #[derive(Debug, Clone)]
@@ -153,8 +156,8 @@ impl State {
                 self.change_player_name(id, name);
                 None
             },
-            Event::Kill { killer, target, mean } => {
-                self.kill(killer, target, mean);
+            Event::Kill { killer, target, means } => {
+                self.kill(killer, target, means);
                 None
             },
         }
@@ -184,9 +187,9 @@ impl State {
         }
     }
 
-    fn kill(&mut self, killer: Killer, target: PlayerId, mean: MeansOfKilling) {
+    fn kill(&mut self, killer: Killer, target: PlayerId, means: MeansOfKilling) {
         if let State::InGame(game) = self {
-            game.kills.push(Kill { killer, target, mean });
+            game.kills.push(Kill { killer, target, means });
         }
     }
 }

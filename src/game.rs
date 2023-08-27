@@ -36,14 +36,14 @@ impl Killer {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Kill {
     pub killer: Killer,
     pub target: PlayerId,
-    pub mean: MeansOfKilling,
+    pub means: MeansOfKilling,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Game {
     pub players: HashMap<PlayerId, PlayerName>,
     pub kills: Vec<Kill>,
