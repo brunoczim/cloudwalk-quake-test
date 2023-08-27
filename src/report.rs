@@ -6,16 +6,16 @@ use crate::game::{
     PlayerName,
     MEANS_OF_KILLING,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use indexmap::{IndexMap, IndexSet};
 
 pub type GameName = String;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct GameReport {
     pub total_kills: KillCount,
-    pub players: BTreeSet<PlayerName>,
-    pub kills: BTreeMap<PlayerName, KillCount>,
-    pub kills_by_means: BTreeMap<MeansOfKilling, KillCount>,
+    pub players: IndexSet<PlayerName>,
+    pub kills: IndexMap<PlayerName, KillCount>,
+    pub kills_by_means: IndexMap<MeansOfKilling, KillCount>,
 }
 
 impl GameReport {
@@ -56,7 +56,7 @@ impl GameReport {
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct LogReport {
-    pub games: BTreeMap<GameName, GameReport>,
+    pub games: IndexMap<GameName, GameReport>,
 }
 
 impl LogReport {
@@ -64,7 +64,7 @@ impl LogReport {
     where
         I: IntoIterator<Item = Result<Game, E>>,
     {
-        let mut this = Self { games: BTreeMap::new() };
+        let mut this = Self { games: IndexMap::new() };
         for (i, result) in game_iter.into_iter().enumerate() {
             let game = result?;
             let game_report = GameReport::generate(&game);
