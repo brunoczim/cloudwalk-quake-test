@@ -48,3 +48,22 @@ pub struct Game {
     pub players: HashMap<PlayerId, PlayerName>,
     pub kills: Vec<Kill>,
 }
+
+#[cfg(test)]
+mod test {
+    use crate::game::{Killer, WORLD_ID};
+
+    #[test]
+    fn killer_from_world() {
+        let expected = Killer::World;
+        let actual = Killer::from_id(WORLD_ID);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn killer_from_player() {
+        let expected = Killer::Player(12);
+        let actual = Killer::from_id(12);
+        assert_eq!(expected, actual);
+    }
+}

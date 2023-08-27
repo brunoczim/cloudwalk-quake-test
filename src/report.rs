@@ -8,9 +8,12 @@ use crate::game::{
 };
 use indexmap::{IndexMap, IndexSet};
 
+#[cfg(test)]
+mod test;
+
 pub type GameName = String;
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct GameReport {
     pub total_kills: KillCount,
     pub players: IndexSet<PlayerName>,
@@ -54,7 +57,7 @@ impl GameReport {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct LogReport {
     pub games: IndexMap<GameName, GameReport>,
 }
