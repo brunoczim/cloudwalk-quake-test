@@ -1,11 +1,14 @@
-use crate::game::{
-    Game,
-    Kill,
-    Killer,
-    MeansOfKilling,
-    PlayerId,
-    PlayerName,
-    MEANS_OF_KILLING,
+use crate::{
+    error::Result,
+    game::{
+        Game,
+        Kill,
+        Killer,
+        MeansOfKilling,
+        PlayerId,
+        PlayerName,
+        MEANS_OF_KILLING,
+    },
 };
 use std::{
     collections::hash_map,
@@ -49,7 +52,7 @@ impl<R> Iterator for Parser<R>
 where
     R: BufRead,
 {
-    type Item = io::Result<Game>;
+    type Item = Result<Game>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -60,7 +63,7 @@ where
                 Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => {
                     return self.finish().map(Ok)
                 },
-                Err(error) => return Some(Err(error)),
+                Err(error) => return Some(Err(error.into())),
                 _ => (),
             }
 
@@ -187,7 +190,12 @@ impl State {
         }
     }
 
-    fn kill(&mut self, killer: Killer, target: PlayerId, means: MeansOfKilling) {
+    fn kill(
+        &mut self,
+        killer: Killer,
+        target: PlayerId,
+        means: MeansOfKilling,
+    ) {
         if let State::InGame(game) = self {
             game.kills.push(Kill { killer, target, means });
         }

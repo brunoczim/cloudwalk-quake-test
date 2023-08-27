@@ -1,5 +1,5 @@
 use clap::Parser as CliParser;
-use quake_log_parser::{parser::Parser, report::LogReport};
+use quake_log_parser::{error::Result, parser::Parser, report::LogReport};
 use std::{fs::File, io, path::PathBuf, process::exit};
 
 #[derive(Debug, Clone, CliParser)]
@@ -8,7 +8,7 @@ struct Arguments {
     input_path: PathBuf,
 }
 
-fn try_main() -> io::Result<()> {
+fn try_main() -> Result<()> {
     let args = Arguments::parse();
     let file = File::open(&args.input_path)?;
     let parser = Parser::new(file);
