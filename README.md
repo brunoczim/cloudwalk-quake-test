@@ -78,6 +78,45 @@ string manually, or at least parts of it. However, that could be judged as
 overfitting the library with the "script" and could lead to loss of
 flexibility.
 
+### Using Enum for MOD (Means of Death) vs. Using Strings
+
+Using `enum` to represent MOD was considered but it was not chosen for a few
+reasons. In first place, Quake's source code has some enum cases which are
+conditioned to a game pack, and those cases are not the last. Therefore, one
+cannot convert a MOD's code in the log directly into a Rust `enum`, because
+some codes vary. Because of that, using an `enum` would imply in some scheme
+for converting strings to enums and vice-versa, and that would increase
+development complexity compared to just using bare string literals.
+
+Enums have some advantages over bare strings, indeed, but currently none of them
+have been required to deal with MOD in this project. One could worry about
+strings being expensive, but static string literals are cheap to copy.
+Therefore, using bare string literals sounds like a better alternative.
+
+### Log Parsing Strategy
+
+1. Do not stop parsing the whole file because of a single line:
+    Logs do not have a well-defined syntax, it is possible that an event might
+    be misidentified by the parser, and even if something is indeed wrong,
+    it is better to extract data in a best-effort manner.
+2. Do not attempt to parse what is not necessary.
+3. Use player ID to track a player, since the player can change its name.
+4. In the `Kill` event:
+    1. Do not assume a fixed ID for the `<world>` as the killer. Instead check
+        the string.
+    2. If the killer is not `<world>`, it is safe to the to use the killer ID
+        as a player ID.
+    3. The target is always a player, it easier to use identified it by its ID.
+    4. MOD code might not always be the same because of packs, do not use the
+        code. Instead, get the string.
+
+### Logging Instead of Panicking
+
+There are some places at the code which have to deal with possibilities that
+could only happen with a bug. Instead of stopping the application and panicking,
+logging such "impossible" scenario and keeping the application running was
+preferred.
+
 ## Script
 
 Script should have as little as code possible, only glueing different
