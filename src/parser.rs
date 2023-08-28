@@ -28,7 +28,7 @@ mod test;
 pub struct Parser<R> {
     /// Where log data will be read from.
     reader: R,
-    /// The buffer for the line, reused every time.
+    /// The buffer destined to the line string, reused every time.
     line_buf: String,
     /// Parser state, fed with lines from the reader.
     state: State,
@@ -55,8 +55,8 @@ where
         Self { reader, line_buf: String::new(), state: State::NoGame }
     }
 
-    /// Finishes the parser when the file reaches its end. If a game was active,
-    /// it is returned.
+    /// Finishes the parser when the file reaches its end. If a game was still
+    /// active, it is returned.
     fn finish(&mut self) -> Option<Game> {
         self.state.finish_game()
     }
@@ -79,7 +79,7 @@ where
     /// Processes a line previously read from the underlying reader by feeding
     /// the line to the state.
     ///
-    /// If a game is finished now, it is returned.
+    /// If a game is finished during this method call, the game is returned.
     fn process_line(&mut self) -> Option<Game> {
         self.state.process_line(&self.line_buf)
     }
@@ -127,48 +127,45 @@ impl<'line> RawEvent<'line> {
     }
 
     /// Parses the raw event representation into a structured event. If the
-    /// event key represents an unused event, it is ignored, if the event
-    /// data does not seem to be valid, it is ignored as well (ignored =
-    /// returns `None`).
+    /// event key represents an unused event, it is ignored. If the event
+    /// data does not seem to be valid, it is ignored as well. Ignored =
+    /// returns `None`.
     fn parse(self) -> Option<Event> {
         match self.key {
             "InitGame" => Some(Event::Init),
-
             "ShutdownGame" => Some(Event::Shutdown),
-
-            "ClientUserinfoChanged" => {
-                let (id_str, tail) = self.raw_data.trim().split_once(' ')?;
-                let id = id_str.trim().parse().ok()?;
-                let (_, name_trailing) = tail.split_once("n\\")?;
-                let name = match name_trailing.split_once("\\") {
-                    Some((name, _)) => name,
-                    None => name_trailing,
-                };
-                Some(Event::PlayerNameChanged {
-                    id,
-                    name: PlayerName::from(name),
-                })
-            },
-
-            "Kill" => {
-                let (killer_id_str, tail) =
-                    self.raw_data.trim().split_once(' ')?;
-                let (target_id_str, tail) = tail.trim().split_once(' ')?;
-                let (_, tail) = tail.trim().split_once(':')?;
-                let killer = if tail.trim().starts_with("<world> killed") {
-                    Killer::World
-                } else {
-                    Killer::Player(killer_id_str.trim().parse().ok()?)
-                };
-                let target = target_id_str.trim().parse().ok()?;
-                let (_, mean_str) = tail.rsplit_once("by ")?;
-                let (_, means) =
-                    all_means_of_death().get_full(mean_str.trim())?;
-                Some(Event::Kill { killer, target, means })
-            },
-
+            "ClientUserinfoChanged" => self.parse_client_user_info_changed(),
+            "Kill" => self.parse_kill(),
             _ => None,
         }
+    }
+
+    /// Parses event data specifically when the key is `ClientUserinfoChanged`.
+    fn parse_client_user_info_changed(self) -> Option<Event> {
+        let (id_str, tail) = self.raw_data.trim().split_once(' ')?;
+        let id = id_str.trim().parse().ok()?;
+        let (_, name_trailing) = tail.split_once("n\\")?;
+        let name = match name_trailing.split_once("\\") {
+            Some((name, _)) => name,
+            None => name_trailing,
+        };
+        Some(Event::PlayerNameChanged { id, name: PlayerName::from(name) })
+    }
+
+    /// Parses event data specifically when the key is `Kill`.
+    fn parse_kill(self) -> Option<Event> {
+        let (killer_id_str, tail) = self.raw_data.trim().split_once(' ')?;
+        let (target_id_str, tail) = tail.trim().split_once(' ')?;
+        let (_, tail) = tail.trim().split_once(':')?;
+        let killer = if tail.trim().starts_with("<world> killed") {
+            Killer::World
+        } else {
+            Killer::Player(killer_id_str.trim().parse().ok()?)
+        };
+        let target = target_id_str.trim().parse().ok()?;
+        let (_, mean_str) = tail.rsplit_once("by ")?;
+        let (_, means) = all_means_of_death().get_full(mean_str.trim())?;
+        Some(Event::Kill { killer, target, means })
     }
 }
 
@@ -207,11 +204,7 @@ impl State {
     fn process_line(&mut self, line: &str) -> Option<Game> {
         let event = RawEvent::from_line(line).and_then(RawEvent::parse)?;
         match event {
-            Event::Init => {
-                let maybe_game = self.finish_game();
-                self.start_game();
-                maybe_game
-            },
+            Event::Init => self.start_game(),
             Event::Shutdown => self.finish_game(),
             Event::PlayerNameChanged { id, name } => {
                 self.change_player_name(id, name);
@@ -233,10 +226,12 @@ impl State {
         }
     }
 
-    /// Starts a new empty game as the current state. This assumes that the
-    /// current state is `NoGame`.
-    fn start_game(&mut self) {
+    /// Starts a new empty game as the current state. Finishes a possible active
+    /// game and returns it (if any).
+    fn start_game(&mut self) -> Option<Game> {
+        let maybe_game = self.finish_game();
         *self = State::InGame(Game::default());
+        maybe_game
     }
 
     /// Reacts to the event of a player changing its name. If the player was not

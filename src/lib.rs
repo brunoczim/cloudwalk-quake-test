@@ -5,7 +5,7 @@
 //!
 //! - Common data, can be interpreted as equivalent to the "domain" in DDD;
 //! - Parser utilities, for parsing the log;
-//! - Common data grouping into report data.
+//! - Report generation from common data.
 
 pub mod error;
 pub mod parser;

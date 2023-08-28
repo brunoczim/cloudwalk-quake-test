@@ -7,5 +7,5 @@
 /// Global error of this library.
 pub type Error = anyhow::Error;
 
-/// Global result type of this library (with flexible error type).
+/// Global result type of this library.
 pub type Result<T, E = Error> = std::result::Result<T, E>;

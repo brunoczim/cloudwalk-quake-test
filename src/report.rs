@@ -1,5 +1,5 @@
-//! This module exposes structures with the finality of building reports from
-//! game data collected from the log file.
+//! This module exposes structures with the finality of building report
+//! datatypes from game information collected from the log file.
 
 use crate::{
     error::Result,
@@ -19,12 +19,13 @@ use indexmap::{IndexMap, IndexSet};
 mod test;
 
 /// Game name in the dictionary of games. This is an expensive-clone string
-/// buffer, but for the current software requirements, it wouldn't be cloned as
+/// buffer, but with the current software requirements, it wouldn't be cloned as
 /// much. In the future it could be a reference-counted string or an interned
 /// string.
 pub type GameName = String;
 
-/// A datatype representing the report of a single game, friendly to `serde`.
+/// A datatype representing the report of a single game, friendly to `serde`
+/// (serialization/deserialization library).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct GameReport {
     /// Total kill count in the game, including the world's.

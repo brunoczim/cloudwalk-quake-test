@@ -1,24 +1,25 @@
-//! This module exposes game datatype and related items, displayed in a way that
-//! other modules can . connect with each other.
+//! This module exposes game datatype and related items common to all other
+//! modules.
 
 use indexmap::IndexSet;
 use std::{collections::HashMap, sync::OnceLock};
 
-/// Player ID in the log file. This size should be Ok for an old game.
+/// Player ID in the log file. This integer bit size should be Ok for an old
+/// game.
 pub type PlayerId = u32;
 
-/// Kill count of a player or a Means of Death in the log file. Allows negative
-/// because a player can have negative score if the world kills him too many
-/// times.
+/// Kill count of a player/MOD in the log file. Allows negative values because a
+/// player can have negative score since a player loses points when killed by
+/// the world.
 pub type KillCount = i64;
 
 /// Player name in the log file. This is an expensive-clone string buffer, but
-/// for the current software requirements, it wouldn't be cloned as much. In the
-/// future it could be a reference-counted string or an interned string.
+/// with the current software requirements, it wouldn't be cloned as much. In
+/// the future it could be a reference-counted string or an interned string.
 pub type PlayerName = String;
 
 /// Means of Death (MOD) as referenced by the log file. It could be an `enum`,
-/// but `enum` advantages are not necessary. A simple string literal is enough
+/// but `enum` is not necessary in this case. A simple string literal is enough
 /// and it is cheap to copy.
 pub type MeansOfDeath = &'static str;
 

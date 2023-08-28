@@ -1,3 +1,4 @@
+use anyhow::Context;
 use clap::Parser as CliParser;
 use quake_log_parser::{error::Result, parser::Parser, report::LogReport};
 use simplelog::{Config, WriteLogger};
@@ -8,7 +9,8 @@ use std::{
     process::exit,
 };
 
-/// Parses a Quake III: Arena log file and prints a grouped data JSON object.
+/// Program helper: parses a Quake III: Arena log file and prints a grouped data
+/// JSON object.
 #[derive(Debug, Clone, CliParser)]
 struct Arguments {
     /// Path to Quake III: Arena log file.
@@ -29,16 +31,21 @@ fn try_main() -> Result<()> {
         .append(true)
         .create(true)
         .open(&args.script_log)?;
+
     WriteLogger::init(
         log::LevelFilter::Warn,
         Config::default(),
         script_log_file,
-    )?;
+    )
+    .context("Failed to setup the application logger")?;
 
-    let quake_file = File::open(&args.quake_log)?;
+    let quake_file = File::open(&args.quake_log).with_context(|| {
+        format!("Failed to open {}", args.quake_log.display())
+    })?;
     let parser = Parser::new(quake_file);
     let report = LogReport::generate(parser)?;
     serde_json::to_writer_pretty(io::stdout(), &report)?;
+    println!();
 
     Ok(())
 }
@@ -46,7 +53,7 @@ fn try_main() -> Result<()> {
 /// Executable main function.
 fn main() {
     if let Err(error) = try_main() {
-        eprintln!("{}", error);
+        eprintln!("{:#}", error);
         exit(1);
     }
 }
