@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use indexmap::IndexSet;
+use std::{collections::HashMap, sync::OnceLock};
 
 pub type PlayerId = u32;
 
@@ -6,17 +7,23 @@ pub type KillCount = i64;
 
 pub type PlayerName = String;
 
-pub type MeansOfKilling = String;
+pub type MeansOfDeath = &'static str;
 
-pub const MEANS_OF_KILLING: &[&str] = &[
-    "MOD_UNKNOWN", "MOD_SHOTGUN", "MOD_GAUNTLET", "MOD_MACHINEGUN",
-    "MOD_GRENADE", "MOD_GRENADE_SPLASH", "MOD_ROCKET", "MOD_ROCKET_SPLASH",
-    "MOD_PLASMA", "MOD_PLASMA_SPLASH", "MOD_RAILGUN", "MOD_LIGHTNING",
-    "MOD_BFG", "MOD_BFG_SPLASH", "MOD_WATER", "MOD_SLIME", "MOD_LAVA",
-    "MOD_CRUSH", "MOD_TELEFRAG", "MOD_FALLING", "MOD_SUICIDE",
-    "MOD_TARGET_LASER", "MOD_TRIGGER_HURT", "MOD_NAIL", "MOD_CHAINGUN",
-    "MOD_PROXIMITY_MINE", "MOD_KAMIKAZE", "MOD_JUICED", "MOD_GRAPPLE",
-];
+pub fn all_means_of_death() -> &'static IndexSet<MeansOfDeath> {
+    static MOD_CELL: OnceLock<IndexSet<MeansOfDeath>> = OnceLock::new();
+    MOD_CELL.get_or_init(|| {
+        IndexSet::from([
+            "MOD_UNKNOWN", "MOD_SHOTGUN", "MOD_GAUNTLET", "MOD_MACHINEGUN",
+            "MOD_GRENADE", "MOD_GRENADE_SPLASH", "MOD_ROCKET",
+            "MOD_ROCKET_SPLASH", "MOD_PLASMA", "MOD_PLASMA_SPLASH",
+            "MOD_RAILGUN", "MOD_LIGHTNING", "MOD_BFG", "MOD_BFG_SPLASH",
+            "MOD_WATER", "MOD_SLIME", "MOD_LAVA", "MOD_CRUSH", "MOD_TELEFRAG",
+            "MOD_FALLING", "MOD_SUICIDE", "MOD_TARGET_LASER",
+            "MOD_TRIGGER_HURT", "MOD_NAIL", "MOD_CHAINGUN",
+            "MOD_PROXIMITY_MINE", "MOD_KAMIKAZE", "MOD_JUICED", "MOD_GRAPPLE",
+        ])
+    })
+}
 
 pub const WORLD_ID: PlayerId = 1022;
 
@@ -40,7 +47,7 @@ impl Killer {
 pub struct Kill {
     pub killer: Killer,
     pub target: PlayerId,
-    pub means: MeansOfKilling,
+    pub means: MeansOfDeath,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

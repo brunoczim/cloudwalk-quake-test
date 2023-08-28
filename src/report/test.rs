@@ -1,11 +1,11 @@
 use super::GameReport;
 use crate::game::{
+    all_means_of_death,
     Game,
     Kill,
     Killer,
-    MeansOfKilling,
+    MeansOfDeath,
     PlayerName,
-    MEANS_OF_KILLING,
 };
 use indexmap::{IndexMap, IndexSet};
 use std::collections::HashMap;
@@ -28,22 +28,22 @@ fn game_2() -> Game {
             Kill {
                 killer: Killer::World,
                 target: 3,
-                means: MeansOfKilling::from("MOD_TRIGGER_HURT"),
+                means: MeansOfDeath::from("MOD_TRIGGER_HURT"),
             },
             Kill {
                 killer: Killer::World,
                 target: 2,
-                means: MeansOfKilling::from("MOD_FALLING"),
+                means: MeansOfDeath::from("MOD_FALLING"),
             },
             Kill {
                 killer: Killer::World,
                 target: 3,
-                means: MeansOfKilling::from("MOD_FALLING"),
+                means: MeansOfDeath::from("MOD_FALLING"),
             },
             Kill {
                 killer: Killer::Player(2),
                 target: 4,
-                means: MeansOfKilling::from("MOD_ROCKET"),
+                means: MeansOfDeath::from("MOD_ROCKET"),
             },
         ],
     }
@@ -54,10 +54,10 @@ fn game_report_1() -> GameReport {
         total_kills: 0,
         players: IndexSet::from([PlayerName::from("Isgalamido")]),
         kills: IndexMap::from([(PlayerName::from("Isgalamido"), 0)]),
-        kills_by_means: MEANS_OF_KILLING
+        kills_by_means: all_means_of_death()
             .iter()
             .copied()
-            .map(|means| (MeansOfKilling::from(means), 0))
+            .map(|means| (MeansOfDeath::from(means), 0))
             .collect(),
     }
 }
@@ -75,7 +75,7 @@ fn game_report_2() -> GameReport {
             (PlayerName::from("Isgalamido"), -2),
             (PlayerName::from("Zeh"), 0),
         ]),
-        kills_by_means: MEANS_OF_KILLING
+        kills_by_means: all_means_of_death()
             .iter()
             .copied()
             .map(|means| {
@@ -85,7 +85,7 @@ fn game_report_2() -> GameReport {
                     "MOD_ROCKET" => 1,
                     _ => 0,
                 };
-                (MeansOfKilling::from(means), count)
+                (MeansOfDeath::from(means), count)
             })
             .collect(),
     }
@@ -94,13 +94,13 @@ fn game_report_2() -> GameReport {
 #[test]
 fn generate_game_report_1() {
     let expected = game_report_1();
-    let actual = GameReport::generate(&game_1());
+    let actual = GameReport::generate(&game_1()).unwrap();
     assert_eq!(expected, actual);
 }
 
 #[test]
 fn generate_game_report_2() {
     let expected = game_report_2();
-    let actual = GameReport::generate(&game_2());
+    let actual = GameReport::generate(&game_2()).unwrap();
     assert_eq!(expected, actual);
 }

@@ -1,13 +1,13 @@
 use crate::{
     error::Result,
     game::{
+        all_means_of_death,
         Game,
         Kill,
         Killer,
-        MeansOfKilling,
+        MeansOfDeath,
         PlayerId,
         PlayerName,
-        MEANS_OF_KILLING,
     },
 };
 use std::{
@@ -109,14 +109,19 @@ impl<'line> RawEvent<'line> {
             },
 
             "Kill" => {
-                let (killer_str, tail) =
+                let (killer_id_str, tail) =
                     self.raw_data.trim().split_once(' ')?;
-                let (target_str, tail) = tail.trim().split_once(' ')?;
-                let (mean_str, _) = tail.trim().split_once(':')?;
-                let killer = Killer::from_id(killer_str.trim().parse().ok()?);
-                let target = target_str.trim().parse().ok()?;
-                let mean_index: usize = mean_str.parse().ok()?;
-                let means = MeansOfKilling::from(MEANS_OF_KILLING[mean_index]);
+                let (target_id_str, tail) = tail.trim().split_once(' ')?;
+                let (_, tail) = tail.trim().split_once(':')?;
+                let killer = if tail.trim().starts_with("<world> killed") {
+                    Killer::World
+                } else {
+                    Killer::Player(killer_id_str.trim().parse().ok()?)
+                };
+                let target = target_id_str.trim().parse().ok()?;
+                let (_, mean_str) = tail.rsplit_once("by ")?;
+                let (_, means) =
+                    all_means_of_death().get_full(mean_str.trim())?;
                 Some(Event::Kill { killer, target, means })
             },
 
@@ -130,7 +135,7 @@ enum Event {
     Init,
     Shutdown,
     PlayerNameChanged { id: PlayerId, name: PlayerName },
-    Kill { killer: Killer, target: PlayerId, means: MeansOfKilling },
+    Kill { killer: Killer, target: PlayerId, means: MeansOfDeath },
 }
 
 #[derive(Debug, Clone)]
@@ -190,12 +195,7 @@ impl State {
         }
     }
 
-    fn kill(
-        &mut self,
-        killer: Killer,
-        target: PlayerId,
-        means: MeansOfKilling,
-    ) {
+    fn kill(&mut self, killer: Killer, target: PlayerId, means: MeansOfDeath) {
         if let State::InGame(game) = self {
             game.kills.push(Kill { killer, target, means });
         }

@@ -1,12 +1,12 @@
 use crate::{
     error::Result,
     game::{
+        all_means_of_death,
         Game,
         KillCount,
         Killer,
-        MeansOfKilling,
+        MeansOfDeath,
         PlayerName,
-        MEANS_OF_KILLING,
     },
 };
 use anyhow::anyhow;
@@ -22,7 +22,7 @@ pub struct GameReport {
     pub total_kills: KillCount,
     pub players: IndexSet<PlayerName>,
     pub kills: IndexMap<PlayerName, KillCount>,
-    pub kills_by_means: IndexMap<MeansOfKilling, KillCount>,
+    pub kills_by_means: IndexMap<MeansOfDeath, KillCount>,
 }
 
 impl GameReport {
@@ -35,10 +35,10 @@ impl GameReport {
         let kills =
             game.players.values().cloned().map(|name| (name, 0)).collect();
 
-        let kills_by_means = MEANS_OF_KILLING
+        let kills_by_means = all_means_of_death()
             .iter()
             .copied()
-            .map(|means| (MeansOfKilling::from(means), 0))
+            .map(|means| (MeansOfDeath::from(means), 0))
             .collect();
 
         let mut this = Self { total_kills, players, kills, kills_by_means };

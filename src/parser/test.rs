@@ -1,6 +1,9 @@
 use super::{Event, Parser, RawEvent, State};
-use crate::game::{Game, Kill, Killer, MeansOfKilling, PlayerName};
-use std::{collections::HashMap, io};
+use crate::{
+    error::Result,
+    game::{Game, Kill, Killer, MeansOfDeath, PlayerName},
+};
+use std::collections::HashMap;
 
 const SMALL_LOG: &str = concat!(
     "  0:00 ------------------------------------------------------------\n",
@@ -84,22 +87,22 @@ fn expected_games_from_small_log() -> Vec<Game> {
                 Kill {
                     killer: Killer::World,
                     target: 3,
-                    means: MeansOfKilling::from("MOD_TRIGGER_HURT"),
+                    means: MeansOfDeath::from("MOD_TRIGGER_HURT"),
                 },
                 Kill {
                     killer: Killer::World,
                     target: 2,
-                    means: MeansOfKilling::from("MOD_FALLING"),
+                    means: MeansOfDeath::from("MOD_FALLING"),
                 },
                 Kill {
                     killer: Killer::World,
                     target: 3,
-                    means: MeansOfKilling::from("MOD_FALLING"),
+                    means: MeansOfDeath::from("MOD_FALLING"),
                 },
                 Kill {
                     killer: Killer::Player(2),
                     target: 4,
-                    means: MeansOfKilling::from("MOD_ROCKET"),
+                    means: MeansOfDeath::from("MOD_ROCKET"),
                 },
             ],
         },
@@ -188,7 +191,7 @@ fn parse_kill_by_player() {
     let expected = Some(Event::Kill {
         killer: Killer::Player(2),
         target: 4,
-        means: MeansOfKilling::from("MOD_ROCKET"),
+        means: MeansOfDeath::from("MOD_ROCKET"),
     });
     let actual = RawEvent::from_line(line).unwrap().parse();
     assert_eq!(expected, actual);
@@ -201,7 +204,7 @@ fn parse_kill_by_world() {
     let expected = Some(Event::Kill {
         killer: Killer::World,
         target: 5,
-        means: MeansOfKilling::from("MOD_TRIGGER_HURT"),
+        means: MeansOfDeath::from("MOD_TRIGGER_HURT"),
     });
     let actual = RawEvent::from_line(line).unwrap().parse();
     assert_eq!(expected, actual);
@@ -237,7 +240,7 @@ fn state_parse_games() {
 fn actual_parse_games() {
     let expected = expected_games_from_small_log();
 
-    let result: io::Result<Vec<_>> =
+    let result: Result<Vec<_>> =
         Parser::new(&mut SMALL_LOG.as_bytes()).collect();
 
     let actual = result.unwrap();
