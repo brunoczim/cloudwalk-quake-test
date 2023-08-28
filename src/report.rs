@@ -1,3 +1,6 @@
+//! This module exposes structures with the finality of building reports from
+//! game data collected from the log file.
+
 use crate::{
     error::Result,
     game::{
@@ -15,17 +18,30 @@ use indexmap::{IndexMap, IndexSet};
 #[cfg(test)]
 mod test;
 
+/// Game name in the dictionary of games. This is an expensive-clone string
+/// buffer, but for the current software requirements, it wouldn't be cloned as
+/// much. In the future it could be a reference-counted string or an interned
+/// string.
 pub type GameName = String;
 
+/// A datatype representing the report of a single game, friendly to `serde`.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct GameReport {
+    /// Total kill count in the game, including the world's.
     pub total_kills: KillCount,
+    /// Set of player names that were in the match, more specifically, the last
+    /// name they used.
     pub players: IndexSet<PlayerName>,
+    /// The mapping of player names to their scores in terms of killing,
+    /// discounting `1` for each time they died because of the "world".
     pub kills: IndexMap<PlayerName, KillCount>,
+    /// The dictionary counting how many killings happened using each means of
+    /// death.
     pub kills_by_means: IndexMap<MeansOfDeath, KillCount>,
 }
 
 impl GameReport {
+    /// Generate the report object from the given game data.
     pub fn generate(game: &Game) -> Result<Self> {
         let total_kills =
             KillCount::try_from(game.kills.len()).unwrap_or(KillCount::MAX);
@@ -81,12 +97,16 @@ impl GameReport {
     }
 }
 
+/// A report of the full Quake III: Arena log file.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct LogReport {
+    /// Dictionary of game reports.
     pub games: IndexMap<GameName, GameReport>,
 }
 
 impl LogReport {
+    /// Generates a report of the whole log file using an iterator over game
+    /// data.
     pub fn generate<I>(game_iter: I) -> Result<Self>
     where
         I: IntoIterator<Item = Result<Game>>,

@@ -1,14 +1,29 @@
+//! This module exposes game datatype and related items, displayed in a way that
+//! other modules can . connect with each other.
+
 use indexmap::IndexSet;
 use std::{collections::HashMap, sync::OnceLock};
 
+/// Player ID in the log file. This size should be Ok for an old game.
 pub type PlayerId = u32;
 
+/// Kill count of a player or a Means of Death in the log file. Allows negative
+/// because a player can have negative score if the world kills him too many
+/// times.
 pub type KillCount = i64;
 
+/// Player name in the log file. This is an expensive-clone string buffer, but
+/// for the current software requirements, it wouldn't be cloned as much. In the
+/// future it could be a reference-counted string or an interned string.
 pub type PlayerName = String;
 
+/// Means of Death (MOD) as referenced by the log file. It could be an `enum`,
+/// but `enum` advantages are not necessary. A simple string literal is enough
+/// and it is cheap to copy.
 pub type MeansOfDeath = &'static str;
 
+/// Returns a set with all valid MODs. This set is created only in the first
+/// call.
 pub fn all_means_of_death() -> &'static IndexSet<MeansOfDeath> {
     static MOD_CELL: OnceLock<IndexSet<MeansOfDeath>> = OnceLock::new();
     MOD_CELL.get_or_init(|| {
@@ -25,52 +40,31 @@ pub fn all_means_of_death() -> &'static IndexSet<MeansOfDeath> {
     })
 }
 
-pub const WORLD_ID: PlayerId = 1022;
-
+/// The agent that kills another agent in the `Kill` event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Killer {
+    /// The world is the killer, e.g. the target died as an accident.
     World,
+    /// The killer is an actual player.
     Player(PlayerId),
 }
 
-impl Killer {
-    pub fn from_id(id: PlayerId) -> Self {
-        if id == WORLD_ID {
-            Self::World
-        } else {
-            Self::Player(id)
-        }
-    }
-}
-
+/// A `Kill` event as read by the log file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Kill {
+    /// The killer agent, player or world.
     pub killer: Killer,
+    /// The target agent, always a dead player.
     pub target: PlayerId,
+    /// The way this killing happened.
     pub means: MeansOfDeath,
 }
 
+/// A game, a full match as read by the logs.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Game {
+    /// Dictionary mapping player IDs to the names they last used in the game.
     pub players: HashMap<PlayerId, PlayerName>,
+    /// A list of `Kill` events in the order they happened.
     pub kills: Vec<Kill>,
-}
-
-#[cfg(test)]
-mod test {
-    use crate::game::{Killer, WORLD_ID};
-
-    #[test]
-    fn killer_from_world() {
-        let expected = Killer::World;
-        let actual = Killer::from_id(WORLD_ID);
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn killer_from_player() {
-        let expected = Killer::Player(12);
-        let actual = Killer::from_id(12);
-        assert_eq!(expected, actual);
-    }
 }

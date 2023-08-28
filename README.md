@@ -25,7 +25,7 @@ Example usage (requesting help): `$ cargo run -- --help`
 
 ### Architecture
 
-This is a small architecture, but consists essentially of three parts:
+The library uses a small architecture, but consists essentially of three parts:
 
 - Common data, can be interpreted as equivalent to the "domain" in DDD;
 - Parser utilities, for parsing the log;
@@ -52,6 +52,14 @@ independent, report generation was coded to depend on an iterator over game data
 `Iterator<Item = Result<Game>>` and not on the parser. In the end, the parser
 module depends only on common data module, and the report generation module
 depends only on common ddata module as well.
+
+### Type Aliases for Bare Datatypes With Extra Semantics
+
+Primitives and other datatypes (such as `String`), when used consistently with
+extra semantics (e.g. as the same field concept in different locations), are
+generally not referenced directly, rather they are given a type alias with a
+specific name to this semantics and then they are referenced using this type
+alias.
 
 ### Avoid Allocating Memory At Once For The Whole File
 
@@ -102,13 +110,10 @@ Therefore, using bare string literals sounds like a better alternative.
 2. Do not attempt to parse what is not necessary.
 3. Use player ID to track a player, since the player can change its name.
 4. In the `Kill` event:
-    1. Do not assume a fixed ID for the `<world>` as the killer. Instead check
-        the string.
-    2. If the killer is not `<world>`, it is safe to the to use the killer ID
-        as a player ID.
-    3. The target is always a player, it easier to use identified it by its ID.
-    4. MOD code might not always be the same because of packs, do not use the
-        code. Instead, get the string.
+5. If an event `InitGame` happens while another game is active, make it
+    immediately shutdown and start a new game.
+6. If an event appears but no game is active, ignore it.
+7. If a player never has their name mentioned, ignore them.
 
 ### Logging Instead of Panicking
 
@@ -122,3 +127,8 @@ preferred.
 Script should have as little as code possible, only glueing different
 parts of the library (and other libraries). The exception is executable-specific
 logic, such as CLI argument parsing.
+
+## Tests
+
+The Library was tested with unit tests covering as much code as possible, not
+only that, testing with actual data from an actual Quake III: Arena log file.
